@@ -3,45 +3,67 @@ const mongoose = require('mongoose');
 const productSchema = new mongoose.Schema({
   nombre: {
     type: String,
-    // required: [true, 'El nombre del producto es requerido'],
+    required: [true, 'El nombre del producto es requerido'],
     trim: true
   },
   descripcion: {
     type: String,
-    // required: [true, 'La descripción del producto es requerida']
+    default: ''
   },
-  precio: {
-    type: String,
-    // required: [true, 'El precio del producto es requerido']
-  },
-  genero: {
-    type: String,
-    // required: [true, 'El género es requerido'],
-    enum: ['masculino', 'femenino', 'unisex'],
-    default: 'unisex'
-  },
-  categoria: {
-    type: String,
-    // required: [true, 'La categoría es requerida']
-  },
-  etiqueta: {
+  descripcionCorta: {
     type: String,
     default: ''
   },
+  precio: {
+    type: Number,
+    required: [true, 'El precio del producto es requerido'],
+    min: [0, 'El precio no puede ser negativo']
+  },
+  genero: {
+    type: String,
+    required: [true, 'El género es requerido'],
+    enum: ['unisex', 'hombre', 'mujer'],
+    default: 'unisex'
+  },
+  categoria: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: [true, 'La categoría es requerida']
+  },
+  imagen: {
+    type: String,
+    default: ''
+  },
+  imagenes: [{
+    type: String
+  }],
+  tallas: [{
+    type: String
+  }],
   stock: {
     type: Number,
     required: [true, 'El stock es requerido'],
     min: [0, 'El stock no puede ser negativo'],
     default: 0
   },
-  imagen: {
+  etiqueta: {
     type: String,
     default: ''
   },
-  createdAt: {
+  activo: {
+    type: Boolean,
+    default: true
+  },
+  fechaCreacion: {
+    type: Date,
+    default: Date.now
+  },
+  fechaActualizacion: {
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: { createdAt: 'fechaCreacion', updatedAt: 'fechaActualizacion' }
 });
 
 module.exports = mongoose.model('Product', productSchema); 

@@ -43,16 +43,34 @@ const productController = {
   // Create new product
   createProduct: async (req, res) => {
     try {
-      const { nombre, descripcion, precio, genero, categoria, etiqueta, stock, imagen } = req.body;
+      const { 
+        nombre, 
+        descripcion, 
+        descripcionCorta,
+        precio, 
+        genero, 
+        categoria, 
+        etiqueta, 
+        stock, 
+        imagen,
+        imagenes,
+        tallas,
+        activo
+      } = req.body;
+      
       const product = new Product({
         nombre,
         descripcion,
+        descripcionCorta,
         precio,
         genero,
         categoria,
         etiqueta,
         stock,
-        imagen
+        imagen,
+        imagenes,
+        tallas,
+        activo
       });
       const newProduct = await product.save();
       res.status(201).json(newProduct);
@@ -64,21 +82,39 @@ const productController = {
   // Update product
   updateProduct: async (req, res) => {
     try {
-      const { nombre, descripcion, precio, genero, categoria, etiqueta, stock, imagen } = req.body;
+      const { 
+        nombre, 
+        descripcion, 
+        descripcionCorta,
+        precio, 
+        genero, 
+        categoria, 
+        etiqueta, 
+        stock, 
+        imagen,
+        imagenes,
+        tallas,
+        activo
+      } = req.body;
+      
       const product = await Product.findById(req.params.id);
       
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      if (nombre) product.nombre = nombre;
-      if (descripcion) product.descripcion = descripcion;
-      if (precio) product.precio = precio;
-      if (genero) product.genero = genero;
-      if (categoria) product.categoria = categoria;
-      if (etiqueta) product.etiqueta = etiqueta;
-      if (stock) product.stock = stock;
-      if (imagen) product.imagen = imagen;
+      if (nombre !== undefined) product.nombre = nombre;
+      if (descripcion !== undefined) product.descripcion = descripcion;
+      if (descripcionCorta !== undefined) product.descripcionCorta = descripcionCorta;
+      if (precio !== undefined) product.precio = precio;
+      if (genero !== undefined) product.genero = genero;
+      if (categoria !== undefined) product.categoria = categoria;
+      if (etiqueta !== undefined) product.etiqueta = etiqueta;
+      if (stock !== undefined) product.stock = stock;
+      if (imagen !== undefined) product.imagen = imagen;
+      if (imagenes !== undefined) product.imagenes = imagenes;
+      if (tallas !== undefined) product.tallas = tallas;
+      if (activo !== undefined) product.activo = activo;
 
       const updatedProduct = await product.save();
       res.json(updatedProduct);
