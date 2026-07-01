@@ -38,13 +38,13 @@ const orderController = {
           });
         }
         
-        // Verificar que la talla esté disponible
-        if (!product.tallas.includes(item.talla)) {
+        if (product.tallas?.length && item.talla && !product.tallas.includes(item.talla)) {
           return res.status(400).json({ 
             message: `Talla ${item.talla} no disponible para ${product.nombre}. Tallas disponibles: ${product.tallas.join(', ')}` 
           });
         }
         
+        const talla = item.talla || product.tallas?.[0] || 'Única';
         const itemSubtotal = product.precio * item.cantidad;
         subtotal += itemSubtotal;
         
@@ -53,7 +53,7 @@ const orderController = {
           nombre: product.nombre,
           precio: product.precio,
           cantidad: item.cantidad,
-          talla: item.talla
+          talla
         });
       }
       
@@ -141,7 +141,7 @@ const orderController = {
   // Actualizar estado de la orden
   updateOrderStatus: async (req, res) => {
     try {
-      const { estado } = req.body;
+      const { estado, numeroGuia, notasInternas } = req.body;
       
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         return res.status(400).json({ message: 'ID de orden inválido' });
@@ -161,6 +161,8 @@ const orderController = {
       }
       
       order.estado = estado;
+      if (numeroGuia !== undefined) order.numeroGuia = numeroGuia;
+      if (notasInternas !== undefined) order.notasInternas = notasInternas;
       const updatedOrder = await order.save();
       
       res.json({

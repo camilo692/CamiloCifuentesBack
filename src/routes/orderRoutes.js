@@ -1,26 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
+const auth = require('../middlewares/auth');
+const roleAuth = require('../middlewares/roleAuth');
 
-// Crear nueva orden
 router.post('/', orderController.createOrder);
 
-// Obtener todas las órdenes
+router.use(auth, roleAuth(['admin']));
+
 router.get('/', orderController.getAllOrders);
-
-// Obtener orden por ID
-router.get('/:id', orderController.getOrderById);
-
-// Obtener órdenes por email del cliente
 router.get('/cliente/:email', orderController.getOrdersByEmail);
-
-// Actualizar estado de la orden
+router.get('/:id', orderController.getOrderById);
 router.put('/:id/status', orderController.updateOrderStatus);
-
-// Actualizar orden completa
 router.put('/:id', orderController.updateOrder);
-
-// Eliminar orden
 router.delete('/:id', orderController.deleteOrder);
 
-module.exports = router; 
+module.exports = router;

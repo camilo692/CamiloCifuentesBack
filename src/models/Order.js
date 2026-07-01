@@ -1,11 +1,14 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  // Información del cliente
   cliente: {
     nombre: {
       type: String,
       required: [true, 'El nombre del cliente es requerido']
+    },
+    apellidos: {
+      type: String,
+      default: ''
     },
     email: {
       type: String,
@@ -14,21 +17,32 @@ const orderSchema = new mongoose.Schema({
     telefono: {
       type: String,
       required: [true, 'El teléfono del cliente es requerido']
+    },
+    cedula: {
+      type: String,
+      default: ''
     }
   },
-  // Dirección de envío
   direccion: {
     calle: {
       type: String,
       required: [true, 'La calle es requerida']
     },
+    complemento: {
+      type: String,
+      default: ''
+    },
     ciudad: {
       type: String,
       required: [true, 'La ciudad es requerida']
     },
+    departamento: {
+      type: String,
+      default: ''
+    },
     codigoPostal: {
       type: String,
-      required: [true, 'El código postal es requerido']
+      default: ''
     },
     pais: {
       type: String,
@@ -36,7 +50,6 @@ const orderSchema = new mongoose.Schema({
       default: 'Colombia'
     }
   },
-  // Productos en la orden
   productos: [{
     producto: {
       type: mongoose.Schema.Types.ObjectId,
@@ -58,10 +71,9 @@ const orderSchema = new mongoose.Schema({
     },
     talla: {
       type: String,
-      required: true
+      default: 'Única'
     }
   }],
-  // Totales
   subtotal: {
     type: Number,
     required: true
@@ -75,24 +87,28 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  // Estado de la orden
   estado: {
     type: String,
     enum: ['pendiente', 'confirmada', 'enviada', 'entregada', 'cancelada'],
     default: 'pendiente'
   },
-  // Método de pago
   metodoPago: {
     type: String,
-    enum: ['efectivo', 'tarjeta', 'transferencia'],
+    enum: ['efectivo', 'tarjeta', 'transferencia', 'mercadopago', 'paypal'],
     required: [true, 'El método de pago es requerido']
   },
-  // Notas adicionales
   notas: {
     type: String,
     default: ''
   },
-  // Fechas
+  notasInternas: {
+    type: String,
+    default: ''
+  },
+  numeroGuia: {
+    type: String,
+    default: ''
+  },
   fechaCreacion: {
     type: Date,
     default: Date.now
@@ -105,4 +121,4 @@ const orderSchema = new mongoose.Schema({
   timestamps: { createdAt: 'fechaCreacion', updatedAt: 'fechaActualizacion' }
 });
 
-module.exports = mongoose.model('Order', orderSchema); 
+module.exports = mongoose.model('Order', orderSchema);
