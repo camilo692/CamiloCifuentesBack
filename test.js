@@ -1,16 +1,18 @@
-const mongoose = require("mongoose");
+require('dotenv').config();
 
-const uri =
-  "mongodb+srv://camilomerch2025:xIU4J2IQjTyrtnrc@store.ja5zg9u.mongodb.net/?retryWrites=true&w=majority&appName=Store";
+const dns = require('dns');
+const mongoose = require('mongoose');
+
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 async function test() {
   try {
-    await mongoose.connect(uri);
-    console.log("✅ Conectado correctamente");
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Conectado correctamente');
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error completo:");
-    console.error(err);
+    console.error('❌ Error completo:');
+    console.error(err.message);
     process.exit(1);
   }
 }
