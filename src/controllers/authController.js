@@ -45,18 +45,17 @@ const authController = {
   // Login user
   login: async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const email = String(req.body.email || '').trim().toLowerCase();
+      const password = String(req.body.password || '');
 
-      // Check for user email
       const user = await User.findOne({ email }).select('+password');
       if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 
-      // Check if password matches
       const isMatch = await user.matchPassword(password);
       if (!isMatch) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Credenciales inválidas' });
       }
 
       // Generate token
