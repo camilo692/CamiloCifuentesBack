@@ -14,6 +14,11 @@ const orderRoutes = require('./routes/orderRoutes');
 // Load environment variables
 dotenv.config();
 
+// Verificar que la URI se está cargando correctamente
+console.log("=====================================");
+console.log("MONGODB_URI:", process.env.MONGODB_URI);
+console.log("=====================================");
+
 // Connect to MongoDB
 connectDB();
 
@@ -43,4 +48,4 @@ const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
+});
