@@ -5,6 +5,8 @@ const uploadController = require('../controllers/uploadController');
 const auth = require('../middlewares/auth');
 const roleAuth = require('../middlewares/roleAuth');
 
+router.post('/presign', auth, roleAuth(['admin']), uploadController.presignUpload);
+
 router.post('/', auth, roleAuth(['admin']), (req, res, next) => {
   upload.single('imagen')(req, res, (err) => {
     if (err) {
