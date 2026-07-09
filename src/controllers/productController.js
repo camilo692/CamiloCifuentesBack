@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const {
+  applyStockFromTallas,
+  getAvailableStock,
+  decrementProductStock,
+  incrementProductStock,
+} = require('../utils/productStock');
 
 const productController = {
   // Get all products
@@ -55,10 +61,11 @@ const productController = {
         imagen,
         imagenes,
         tallas,
+        stockPorTalla,
         activo
       } = req.body;
-      
-      const product = new Product({
+
+      const productData = applyStockFromTallas({
         nombre,
         descripcion,
         descripcionCorta,
@@ -70,8 +77,11 @@ const productController = {
         imagen,
         imagenes,
         tallas,
+        stockPorTalla,
         activo
       });
+      
+      const product = new Product(productData);
       const newProduct = await product.save();
       res.status(201).json(newProduct);
     } catch (error) {
@@ -94,6 +104,7 @@ const productController = {
         imagen,
         imagenes,
         tallas,
+        stockPorTalla,
         activo
       } = req.body;
       
@@ -103,18 +114,23 @@ const productController = {
         return res.status(404).json({ message: 'Product not found' });
       }
 
-      if (nombre !== undefined) product.nombre = nombre;
-      if (descripcion !== undefined) product.descripcion = descripcion;
-      if (descripcionCorta !== undefined) product.descripcionCorta = descripcionCorta;
-      if (precio !== undefined) product.precio = precio;
-      if (genero !== undefined) product.genero = genero;
-      if (categoria !== undefined) product.categoria = categoria;
-      if (etiqueta !== undefined) product.etiqueta = etiqueta;
-      if (stock !== undefined) product.stock = stock;
-      if (imagen !== undefined) product.imagen = imagen;
-      if (imagenes !== undefined) product.imagenes = imagenes;
-      if (tallas !== undefined) product.tallas = tallas;
-      if (activo !== undefined) product.activo = activo;
+      const updateData = applyStockFromTallas({
+        nombre: nombre !== undefined ? nombre : product.nombre,
+        descripcion: descripcion !== undefined ? descripcion : product.descripcion,
+        descripcionCorta: descripcionCorta !== undefined ? descripcionCorta : product.descripcionCorta,
+        precio: precio !== undefined ? precio : product.precio,
+        genero: genero !== undefined ? genero : product.genero,
+        categoria: categoria !== undefined ? categoria : product.categoria,
+        etiqueta: etiqueta !== undefined ? etiqueta : product.etiqueta,
+        stock: stock !== undefined ? stock : product.stock,
+        imagen: imagen !== undefined ? imagen : product.imagen,
+        imagenes: imagenes !== undefined ? imagenes : product.imagenes,
+        tallas: tallas !== undefined ? tallas : product.tallas,
+        stockPorTalla: stockPorTalla !== undefined ? stockPorTalla : product.stockPorTalla,
+        activo: activo !== undefined ? activo : product.activo,
+      });
+
+      Object.assign(product, updateData);
 
       const updatedProduct = await product.save();
       res.json(updatedProduct);

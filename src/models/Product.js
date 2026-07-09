@@ -40,6 +40,18 @@ const productSchema = new mongoose.Schema({
   tallas: [{
     type: String
   }],
+  stockPorTalla: [{
+    talla: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    cantidad: {
+      type: Number,
+      default: 0,
+      min: [0, 'El stock por talla no puede ser negativo']
+    }
+  }],
   stock: {
     type: Number,
     required: [true, 'El stock es requerido'],

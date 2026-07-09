@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const {
+  getAvailableStock,
+  decrementProductStock,
+  incrementProductStock,
+} = require('../utils/productStock');
 
 const orderController = {
   // Crear nueva orden
@@ -32,9 +37,13 @@ const orderController = {
           });
         }
         
-        if (product.stock < item.cantidad) {
+        const talla = item.talla || product.tallas?.[0] || 'Única';
+        const availableStock = getAvailableStock(product, product.tallas?.length ? talla : null);
+
+        if (availableStock < item.cantidad) {
+          const tallaLabel = product.tallas?.length ? ` (talla ${talla})` : '';
           return res.status(400).json({ 
-            message: `Stock insuficiente para ${product.nombre}. Disponible: ${product.stock}` 
+            message: `Stock insuficiente para ${product.nombre}${tallaLabel}. Disponible: ${availableStock}` 
           });
         }
         
@@ -44,7 +53,6 @@ const orderController = {
           });
         }
         
-        const talla = item.talla || product.tallas?.[0] || 'Única';
         const itemSubtotal = product.precio * item.cantidad;
         subtotal += itemSubtotal;
         
@@ -75,10 +83,20 @@ const orderController = {
       
       // Actualizar stock de productos
       for (const item of productos) {
-        await Product.findByIdAndUpdate(
+        const product = await Product.findById(item.productId);
+        const talla = item.talla || product?.tallas?.[0] || 'Única';
+        const updated = await decrementProductStock(
+          Product,
           item.productId,
-          { $inc: { stock: -item.cantidad } }
+          item.cantidad,
+          product?.tallas?.length ? talla : null
         );
+
+        if (!updated) {
+          return res.status(400).json({
+            message: `No se pudo actualizar el stock para el producto ${item.productId}`,
+          });
+        }
       }
       
       res.status(201).json({
@@ -222,9 +240,13 @@ const orderController = {
             });
           }
           
-          if (product.stock < item.cantidad) {
+          const talla = item.talla || product.tallas?.[0] || 'Única';
+          const availableStock = getAvailableStock(product, product.tallas?.length ? talla : null);
+
+          if (availableStock < item.cantidad) {
+            const tallaLabel = product.tallas?.length ? ` (talla ${talla})` : '';
             return res.status(400).json({ 
-              message: `Stock insuficiente para ${product.nombre}. Disponible: ${product.stock}` 
+              message: `Stock insuficiente para ${product.nombre}${tallaLabel}. Disponible: ${availableStock}` 
             });
           }
           
@@ -277,9 +299,11 @@ const orderController = {
       
       // Restaurar stock de productos
       for (const item of order.productos) {
-        await Product.findByIdAndUpdate(
+        await incrementProductStock(
+          Product,
           item.producto,
-          { $inc: { stock: item.cantidad } }
+          item.cantidad,
+          item.talla
         );
       }
       
