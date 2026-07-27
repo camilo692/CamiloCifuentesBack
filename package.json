@@ -6,6 +6,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "create-admin": "node scripts/createAdmin.js",
+    "seed-categories": "node scripts/seedCategories.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

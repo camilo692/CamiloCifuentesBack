@@ -1,6 +1,7 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const User = require('../src/models/User');
 
 const createAdmin = async () => {
@@ -10,16 +11,19 @@ const createAdmin = async () => {
 
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    const hashed = await bcrypt.hash(password, 10);
 
-    await User.findOneAndUpdate(
-      { email },
-      { name, email, password: hashed, role: 'admin' },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    let user = await User.findOne({ email }).select('+password');
+    if (user) {
+      user.name = name;
+      user.role = 'admin';
+      user.password = password;
+      await user.save();
+    } else {
+      user = await User.create({ name, email, password, role: 'admin' });
+    }
 
-    const user = await User.findOne({ email }).select('+password');
-    const ok = await bcrypt.compare(password, user.password);
+    const check = await User.findOne({ email }).select('+password');
+    const ok = await check.matchPassword(password);
     console.log(ok ? `Usuario admin listo: ${email}` : 'Error: la contraseña no coincide');
     process.exit(ok ? 0 : 1);
   } catch (error) {
