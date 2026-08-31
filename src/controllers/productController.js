@@ -11,7 +11,7 @@ const productController = {
   // Get all products
   getAllProducts: async (req, res) => {
     try {
-      const products = await Product.find();
+      const products = await Product.find().sort({ orden: 1, fechaCreacion: -1 });
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -22,7 +22,10 @@ const productController = {
   getProductsByCategory: async (req, res) => {
     try {
       console.log(req.params.categoryId,"categoryId");
-      const products = await Product.find({ categoria: req.params.categoryId });
+      const products = await Product.find({ categoria: req.params.categoryId }).sort({
+        orden: 1,
+        fechaCreacion: -1,
+      });
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -62,6 +65,7 @@ const productController = {
         imagenes,
         tallas,
         stockPorTalla,
+        orden,
         activo
       } = req.body;
 
@@ -78,6 +82,7 @@ const productController = {
         imagenes,
         tallas,
         stockPorTalla,
+        orden: orden !== undefined && orden !== '' ? Number(orden) : 0,
         activo
       });
       
@@ -105,6 +110,7 @@ const productController = {
         imagenes,
         tallas,
         stockPorTalla,
+        orden,
         activo
       } = req.body;
       
@@ -127,6 +133,7 @@ const productController = {
         imagenes: imagenes !== undefined ? imagenes : product.imagenes,
         tallas: tallas !== undefined ? tallas : product.tallas,
         stockPorTalla: stockPorTalla !== undefined ? stockPorTalla : product.stockPorTalla,
+        orden: orden !== undefined && orden !== '' ? Number(orden) : product.orden ?? 0,
         activo: activo !== undefined ? activo : product.activo,
       });
 

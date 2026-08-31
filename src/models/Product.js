@@ -62,6 +62,11 @@ const productSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  orden: {
+    type: Number,
+    default: 0,
+    min: [0, 'El orden no puede ser negativo']
+  },
   activo: {
     type: Boolean,
     default: true
