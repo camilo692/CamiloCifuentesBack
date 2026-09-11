@@ -11,8 +11,32 @@ const productController = {
   // Get all products
   getAllProducts: async (req, res) => {
     try {
+      const products = await Product.find({ activo: true }).sort({ orden: 1, fechaCreacion: -1 });
+      res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  getAllProductsAdmin: async (req, res) => {
+    try {
       const products = await Product.find().sort({ orden: 1, fechaCreacion: -1 });
       res.json(products);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  getProductByIdAdmin: async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid product ID format' });
+    }
+    try {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      res.json(product);
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -21,8 +45,10 @@ const productController = {
   // Get products by category
   getProductsByCategory: async (req, res) => {
     try {
-      console.log(req.params.categoryId,"categoryId");
-      const products = await Product.find({ categoria: req.params.categoryId }).sort({
+      const products = await Product.find({
+        categoria: req.params.categoryId,
+        activo: true,
+      }).sort({
         orden: 1,
         fechaCreacion: -1,
       });
@@ -39,7 +65,7 @@ const productController = {
     }
     try {
       const product = await Product.findById(req.params.id);
-      if (!product) {
+      if (!product || !product.activo) {
         return res.status(404).json({ message: 'Product not found' });
       }
       res.json(product);

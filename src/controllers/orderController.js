@@ -177,6 +177,26 @@ const orderController = {
           message: `Estado inválido. Estados válidos: ${estadosValidos.join(', ')}` 
         });
       }
+
+      const estadoAnterior = order.estado;
+
+      if (estado === 'cancelada' && estadoAnterior !== 'cancelada') {
+        for (const item of order.productos) {
+          const productId = item.producto?._id || item.producto;
+          const restored = await incrementProductStock(
+            Product,
+            productId,
+            item.cantidad,
+            item.talla
+          );
+
+          if (!restored) {
+            return res.status(400).json({
+              message: `No se pudo restaurar el stock del producto ${item.nombre}`,
+            });
+          }
+        }
+      }
       
       order.estado = estado;
       if (numeroGuia !== undefined) order.numeroGuia = numeroGuia;
@@ -184,7 +204,10 @@ const orderController = {
       const updatedOrder = await order.save();
       
       res.json({
-        message: 'Estado de orden actualizado',
+        message:
+          estado === 'cancelada' && estadoAnterior !== 'cancelada'
+            ? 'Orden cancelada y stock devuelto al catálogo'
+            : 'Estado de orden actualizado',
         order: updatedOrder
       });
     } catch (error) {

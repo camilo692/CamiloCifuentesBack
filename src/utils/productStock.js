@@ -77,9 +77,11 @@ async function incrementProductStock(Product, productId, cantidad, talla) {
   if (!product) return null;
 
   if (product.stockPorTalla?.length && talla) {
-    const entry = product.stockPorTalla.find((item) => item.talla === talla);
+    let entry = product.stockPorTalla.find((item) => item.talla === talla);
     if (entry) {
       entry.cantidad += cantidad;
+    } else {
+      product.stockPorTalla.push({ talla, cantidad });
     }
   }
 
