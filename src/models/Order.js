@@ -109,6 +109,37 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  siigoFactura: {
+    estado: {
+      type: String,
+      enum: ['pendiente', 'emitida', 'error', 'omitida'],
+      default: 'pendiente'
+    },
+    id: {
+      type: String,
+      default: ''
+    },
+    name: {
+      type: String,
+      default: ''
+    },
+    number: {
+      type: Number,
+      default: null
+    },
+    publicUrl: {
+      type: String,
+      default: ''
+    },
+    error: {
+      type: String,
+      default: ''
+    },
+    fechaEmision: {
+      type: Date,
+      default: null
+    }
+  },
   fechaCreacion: {
     type: Date,
     default: Date.now

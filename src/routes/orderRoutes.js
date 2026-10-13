@@ -12,6 +12,7 @@ router.get('/', orderController.getAllOrders);
 router.get('/cliente/:email', orderController.getOrdersByEmail);
 router.get('/:id', orderController.getOrderById);
 router.put('/:id/status', orderController.updateOrderStatus);
+router.post('/:id/siigo-invoice', orderController.retrySiigoInvoice);
 router.put('/:id', orderController.updateOrder);
 router.delete('/:id', orderController.deleteOrder);
 

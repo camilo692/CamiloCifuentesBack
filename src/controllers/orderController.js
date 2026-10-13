@@ -6,6 +6,49 @@ const {
   decrementProductStock,
   incrementProductStock,
 } = require('../utils/productStock');
+const { isSiigoEnabled } = require('../config/siigo');
+const {
+  crearFacturaSiigo,
+  mapSiigoInvoiceResult,
+} = require('../services/siigoInvoiceService');
+
+async function emitirFacturaSiigo(order) {
+  if (!isSiigoEnabled()) {
+    order.siigoFactura = {
+      estado: 'omitida',
+      error: 'Siigo no está habilitado (SIIGO_ENABLED=false)',
+    };
+    await order.save();
+    return order;
+  }
+
+  if (order.siigoFactura?.estado === 'emitida' && order.siigoFactura?.id) {
+    return order;
+  }
+
+  try {
+    const invoice = await crearFacturaSiigo(order);
+    const mapped = mapSiigoInvoiceResult(invoice);
+    order.siigoFactura = {
+      estado: 'emitida',
+      id: mapped.id,
+      name: mapped.name,
+      number: mapped.number,
+      publicUrl: mapped.publicUrl,
+      error: '',
+      fechaEmision: new Date(),
+    };
+  } catch (error) {
+    console.error('Error al facturar en Siigo:', error.message);
+    order.siigoFactura = {
+      estado: 'error',
+      error: error.message,
+    };
+  }
+
+  await order.save();
+  return order;
+}
 
 const orderController = {
   // Crear nueva orden
@@ -98,6 +141,8 @@ const orderController = {
           });
         }
       }
+
+      await emitirFacturaSiigo(savedOrder);
       
       res.status(201).json({
         message: 'Orden creada exitosamente',
@@ -332,6 +377,39 @@ const orderController = {
       
       await order.deleteOne();
       res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  retrySiigoInvoice: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'ID de orden inválido' });
+      }
+
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: 'Orden no encontrada' });
+      }
+
+      if (order.estado === 'cancelada') {
+        return res.status(400).json({ message: 'No se puede facturar una orden cancelada' });
+      }
+
+      await emitirFacturaSiigo(order);
+
+      if (order.siigoFactura?.estado === 'emitida') {
+        return res.json({
+          message: 'Factura electrónica emitida en Siigo',
+          order,
+        });
+      }
+
+      return res.status(502).json({
+        message: order.siigoFactura?.error || 'No se pudo emitir la factura en Siigo',
+        order,
+      });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }

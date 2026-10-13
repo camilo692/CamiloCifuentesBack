@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const { getSiigoPublicStatus } = require('../config/siigo');
 
 const adminController = {
   getStats: async (_req, res) => {
@@ -44,9 +45,34 @@ const adminController = {
       const pedidosRecientes = await Order.find()
         .sort({ fechaCreacion: -1 })
         .limit(5)
-        .select('cliente total estado fechaCreacion');
+        .select('cliente total estado fechaCreacion siigoFactura');
 
       const totalProductos = await Product.countDocuments({ activo: true });
+
+      const facturacionPorEstado = {
+        emitida: 0,
+        error: 0,
+        omitida: 0,
+        pendiente: 0,
+      };
+
+      orders.forEach((order) => {
+        const estadoFactura = order.siigoFactura?.estado || 'pendiente';
+        facturacionPorEstado[estadoFactura] = (facturacionPorEstado[estadoFactura] || 0) + 1;
+      });
+
+      const facturasEmitidas = orders.filter((o) => o.siigoFactura?.estado === 'emitida');
+      const totalFacturado = facturasEmitidas.reduce((sum, o) => sum + (o.total || 0), 0);
+
+      const facturasRecientes = await Order.find({ 'siigoFactura.estado': { $exists: true } })
+        .sort({ fechaCreacion: -1 })
+        .limit(8)
+        .select('cliente total estado fechaCreacion siigoFactura');
+
+      const facturasConError = await Order.find({ 'siigoFactura.estado': 'error' })
+        .sort({ fechaActualizacion: -1 })
+        .limit(8)
+        .select('cliente total estado fechaCreacion siigoFactura');
 
       res.json({
         totalVentas,
@@ -55,7 +81,15 @@ const adminController = {
         porEstado,
         topProductos,
         pedidosRecientes,
-        totalProductos
+        totalProductos,
+        siigo: {
+          ...getSiigoPublicStatus(),
+          porEstado: facturacionPorEstado,
+          totalFacturado,
+          totalEmitidas: facturacionPorEstado.emitida,
+          facturasRecientes,
+          facturasConError,
+        },
       });
     } catch (error) {
       res.status(500).json({ message: error.message });
