@@ -6,49 +6,9 @@ const {
   decrementProductStock,
   incrementProductStock,
 } = require('../utils/productStock');
-const { isSiigoEnabled } = require('../config/siigo');
-const {
-  crearFacturaSiigo,
-  mapSiigoInvoiceResult,
-} = require('../services/siigoInvoiceService');
-
-async function emitirFacturaSiigo(order) {
-  if (!isSiigoEnabled()) {
-    order.siigoFactura = {
-      estado: 'omitida',
-      error: 'Siigo no está habilitado (SIIGO_ENABLED=false)',
-    };
-    await order.save();
-    return order;
-  }
-
-  if (order.siigoFactura?.estado === 'emitida' && order.siigoFactura?.id) {
-    return order;
-  }
-
-  try {
-    const invoice = await crearFacturaSiigo(order);
-    const mapped = mapSiigoInvoiceResult(invoice);
-    order.siigoFactura = {
-      estado: 'emitida',
-      id: mapped.id,
-      name: mapped.name,
-      number: mapped.number,
-      publicUrl: mapped.publicUrl,
-      error: '',
-      fechaEmision: new Date(),
-    };
-  } catch (error) {
-    console.error('Error al facturar en Siigo:', error.message);
-    order.siigoFactura = {
-      estado: 'error',
-      error: error.message,
-    };
-  }
-
-  await order.save();
-  return order;
-}
+const { isPaymentsQueueEnabled } = require('../config/queue');
+const { enqueuePaymentJob } = require('../services/paymentsQueue');
+const { emitirFacturaSiigo } = require('../services/orderSiigo');
 
 const orderController = {
   // Crear nueva orden
@@ -142,6 +102,7 @@ const orderController = {
         });
       }
 
+      const queueEnabled = isPaymentsQueueEnabled();
       let savedOrder;
       try {
         const order = new Order({
@@ -152,7 +113,14 @@ const orderController = {
           envio,
           total,
           metodoPago,
-          notas
+          notas,
+          pago: queueEnabled
+            ? { estado: 'en_cola', proveedor: process.env.PAYMENT_PROVIDER || 'none' }
+            : {
+                estado: 'omitido',
+                proveedor: 'none',
+                ultimoError: 'Cola de pagos desactivada. No se cobró tarjeta.',
+              },
         });
         savedOrder = await order.save();
       } catch (error) {
@@ -167,8 +135,37 @@ const orderController = {
         throw error;
       }
 
+      async function rollbackReservas() {
+        for (const reserva of reservas) {
+          await incrementProductStock(
+            Product,
+            reserva.producto,
+            reserva.cantidad,
+            reserva.talla
+          );
+        }
+      }
+
+      if (queueEnabled) {
+        try {
+          await enqueuePaymentJob(savedOrder._id);
+        } catch (error) {
+          await rollbackReservas();
+          await savedOrder.deleteOne();
+          return res.status(503).json({
+            message:
+              'No se pudo encolar el pago. No se realizó el pedido. Intenta de nuevo en unos minutos.',
+          });
+        }
+
+        return res.status(201).json({
+          message: 'Orden creada. El pago quedó en cola para procesarse.',
+          order: savedOrder,
+        });
+      }
+
       await emitirFacturaSiigo(savedOrder);
-      
+
       res.status(201).json({
         message: 'Orden creada exitosamente',
         order: savedOrder

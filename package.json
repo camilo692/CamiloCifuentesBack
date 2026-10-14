@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "worker": "node src/workers/paymentWorker.js",
     "create-admin": "node scripts/createAdmin.js",
     "seed-categories": "node scripts/seedCategories.js",
     "seed-product-order": "node scripts/seedProductOrder.js",
@@ -16,6 +17,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",
+    "@aws-sdk/client-sqs": "^3.1151.0",
     "@aws-sdk/s3-request-presigner": "^3.1083.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
