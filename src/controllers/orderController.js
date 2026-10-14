@@ -84,9 +84,9 @@ const orderController = {
         const availableStock = getAvailableStock(product, product.tallas?.length ? talla : null);
 
         if (availableStock < item.cantidad) {
-          const tallaLabel = product.tallas?.length ? ` (talla ${talla})` : '';
+          const tallaLabel = product.tallas?.length ? ` talla ${talla}` : '';
           return res.status(400).json({ 
-            message: `Stock insuficiente para ${product.nombre}${tallaLabel}. Disponible: ${availableStock}` 
+            message: `Lo sentimos, "${product.nombre}"${tallaLabel} ya no tiene unidades suficientes (quedan ${availableStock}). No se realizó el pedido. Elige otra talla o producto.` 
           });
         }
         
@@ -109,37 +109,62 @@ const orderController = {
       }
       
       const total = subtotal + envio;
-      
-      // Crear la orden
-      const order = new Order({
-        cliente,
-        direccion,
-        productos: productosCompletos,
-        subtotal,
-        envio,
-        total,
-        metodoPago,
-        notas
-      });
-      
-      const savedOrder = await order.save();
-      
-      // Actualizar stock de productos
-      for (const item of productos) {
-        const product = await Product.findById(item.productId);
-        const talla = item.talla || product?.tallas?.[0] || 'Única';
+
+      const reservas = [];
+      for (const item of productosCompletos) {
         const updated = await decrementProductStock(
           Product,
-          item.productId,
+          item.producto,
           item.cantidad,
-          product?.tallas?.length ? talla : null
+          item.talla
         );
 
         if (!updated) {
+          for (const reserva of reservas) {
+            await incrementProductStock(
+              Product,
+              reserva.producto,
+              reserva.cantidad,
+              reserva.talla
+            );
+          }
+
+          const tallaLabel = item.talla ? ` talla ${item.talla}` : '';
           return res.status(400).json({
-            message: `No se pudo actualizar el stock para el producto ${item.productId}`,
+            message: `Lo sentimos, "${item.nombre}"${tallaLabel} se agotó mientras completabas el pago. No se realizó el pedido. Vuelve al carrito y elige otra talla o producto.`,
           });
         }
+
+        reservas.push({
+          producto: item.producto,
+          cantidad: item.cantidad,
+          talla: item.talla,
+        });
+      }
+
+      let savedOrder;
+      try {
+        const order = new Order({
+          cliente,
+          direccion,
+          productos: productosCompletos,
+          subtotal,
+          envio,
+          total,
+          metodoPago,
+          notas
+        });
+        savedOrder = await order.save();
+      } catch (error) {
+        for (const reserva of reservas) {
+          await incrementProductStock(
+            Product,
+            reserva.producto,
+            reserva.cantidad,
+            reserva.talla
+          );
+        }
+        throw error;
       }
 
       await emitirFacturaSiigo(savedOrder);

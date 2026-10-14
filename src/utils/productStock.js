@@ -48,46 +48,82 @@ function getAvailableStock(product, talla) {
 }
 
 async function decrementProductStock(Product, productId, cantidad, talla) {
-  const product = await Product.findById(productId);
+  const qty = Number(cantidad);
+  if (!productId || !Number.isFinite(qty) || qty <= 0) return null;
+
+  const product = await Product.findById(productId).lean();
   if (!product) return null;
 
   if (product.stockPorTalla?.length && talla) {
-    const entry = product.stockPorTalla.find((item) => item.talla === talla);
-    if (!entry || entry.cantidad < cantidad) {
-      return null;
-    }
-
-    entry.cantidad -= cantidad;
-    product.stock = Math.max(0, product.stock - cantidad);
-    await product.save();
-    return product;
+    return Product.findOneAndUpdate(
+      {
+        _id: productId,
+        stockPorTalla: {
+          $elemMatch: {
+            talla,
+            cantidad: { $gte: qty },
+          },
+        },
+      },
+      {
+        $inc: {
+          'stockPorTalla.$.cantidad': -qty,
+          stock: -qty,
+        },
+      },
+      { new: true }
+    );
   }
 
-  if (product.stock < cantidad) {
-    return null;
-  }
-
-  product.stock -= cantidad;
-  await product.save();
-  return product;
+  return Product.findOneAndUpdate(
+    {
+      _id: productId,
+      stock: { $gte: qty },
+    },
+    { $inc: { stock: -qty } },
+    { new: true }
+  );
 }
 
 async function incrementProductStock(Product, productId, cantidad, talla) {
-  const product = await Product.findById(productId);
-  if (!product) return null;
+  const qty = Number(cantidad);
+  if (!productId || !Number.isFinite(qty) || qty <= 0) return null;
 
-  if (product.stockPorTalla?.length && talla) {
-    let entry = product.stockPorTalla.find((item) => item.talla === talla);
-    if (entry) {
-      entry.cantidad += cantidad;
-    } else {
-      product.stockPorTalla.push({ talla, cantidad });
+  if (talla) {
+    const updated = await Product.findOneAndUpdate(
+      {
+        _id: productId,
+        'stockPorTalla.talla': talla,
+      },
+      {
+        $inc: {
+          'stockPorTalla.$.cantidad': qty,
+          stock: qty,
+        },
+      },
+      { new: true }
+    );
+
+    if (updated) return updated;
+
+    const product = await Product.findById(productId).lean();
+    if (product?.stockPorTalla?.length) {
+      return Product.findOneAndUpdate(
+        { _id: productId },
+        {
+          $push: { stockPorTalla: { talla, cantidad: qty } },
+          $inc: { stock: qty },
+        },
+        { new: true }
+      );
     }
   }
 
-  product.stock += cantidad;
-  await product.save();
-  return product;
+  return Product.findOneAndUpdate(
+    { _id: productId },
+    { $inc: { stock: qty } },
+    { new: true }
+  );
 }
 
 module.exports = {
