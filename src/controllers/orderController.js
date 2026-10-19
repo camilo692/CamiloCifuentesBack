@@ -9,6 +9,8 @@ const {
 const { isPaymentsQueueEnabled } = require('../config/queue');
 const { enqueuePaymentJob } = require('../services/paymentsQueue');
 const { emitirFacturaSiigo } = require('../services/orderSiigo');
+const { isWompiEnabled } = require('../config/wompi');
+const { buildWompiCheckout } = require('../services/wompiService');
 
 const orderController = {
   // Crear nueva orden
@@ -102,7 +104,9 @@ const orderController = {
         });
       }
 
-      const queueEnabled = isPaymentsQueueEnabled();
+      const wompiEnabled = isWompiEnabled();
+      const queueEnabled = !wompiEnabled && isPaymentsQueueEnabled();
+      const metodo = wompiEnabled ? 'wompi' : metodoPago;
       let savedOrder;
       try {
         const order = new Order({
@@ -112,9 +116,11 @@ const orderController = {
           subtotal,
           envio,
           total,
-          metodoPago,
+          metodoPago: metodo,
           notas,
-          pago: queueEnabled
+          pago: wompiEnabled
+            ? { estado: 'en_cola', proveedor: 'wompi' }
+            : queueEnabled
             ? { estado: 'en_cola', proveedor: process.env.PAYMENT_PROVIDER || 'none' }
             : {
                 estado: 'omitido',
@@ -144,6 +150,19 @@ const orderController = {
             reserva.talla
           );
         }
+      }
+
+      if (wompiEnabled) {
+        const wompi = buildWompiCheckout(savedOrder);
+        savedOrder.pago.reference = wompi.reference;
+        savedOrder.pago.amountInCents = wompi.amountInCents;
+        await savedOrder.save();
+
+        return res.status(201).json({
+          message: 'Orden creada. Completa el pago con Wompi.',
+          order: savedOrder,
+          wompi,
+        });
       }
 
       if (queueEnabled) {

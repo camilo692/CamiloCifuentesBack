@@ -94,7 +94,7 @@ const orderSchema = new mongoose.Schema({
   },
   metodoPago: {
     type: String,
-    enum: ['efectivo', 'tarjeta', 'transferencia', 'mercadopago', 'paypal'],
+    enum: ['efectivo', 'tarjeta', 'transferencia', 'mercadopago', 'paypal', 'wompi'],
     required: [true, 'El método de pago es requerido']
   },
   pago: {
@@ -106,6 +106,22 @@ const orderSchema = new mongoose.Schema({
     proveedor: {
       type: String,
       default: 'none'
+    },
+    transactionId: {
+      type: String,
+      default: ''
+    },
+    reference: {
+      type: String,
+      default: ''
+    },
+    amountInCents: {
+      type: Number,
+      default: 0
+    },
+    stockRestored: {
+      type: Boolean,
+      default: false
     },
     intentos: {
       type: Number,
