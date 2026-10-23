@@ -13,10 +13,10 @@ function getWompiConfig() {
     .filter(Boolean)[0] || 'http://localhost:3000';
 
   return {
-    publicKey: process.env.WOMPI_PUBLIC_KEY || '',
-    privateKey: process.env.WOMPI_PRIVATE_KEY || '',
-    integritySecret: process.env.WOMPI_INTEGRITY_SECRET || '',
-    eventsSecret: process.env.WOMPI_EVENTS_SECRET || '',
+    publicKey: String(process.env.WOMPI_PUBLIC_KEY || '').trim(),
+    privateKey: String(process.env.WOMPI_PRIVATE_KEY || '').trim(),
+    integritySecret: String(process.env.WOMPI_INTEGRITY_SECRET || '').trim(),
+    eventsSecret: String(process.env.WOMPI_EVENTS_SECRET || '').trim(),
     redirectUrl:
       process.env.WOMPI_REDIRECT_URL || `${firstFrontend}/tienda/confirmacion`,
     currency: 'COP',
