@@ -138,6 +138,11 @@ const orderSchema = new mongoose.Schema({
     reservadoHasta: {
       type: Date,
       default: null
+    },
+    checkoutToken: {
+      type: String,
+      default: '',
+      select: false
     }
   },
   notas: {

@@ -3,10 +3,21 @@ const router = express.Router();
 const orderController = require('../controllers/orderController');
 const auth = require('../middlewares/auth');
 const roleAuth = require('../middlewares/roleAuth');
+const requireStoreOrigin = require('../middlewares/requireStoreOrigin');
+const {
+  orderCreateLimiter,
+  lookupLimiter,
+  abandonLimiter,
+} = require('../middlewares/rateLimits');
 
-router.post('/', orderController.createOrder);
-router.post('/lookup', orderController.lookupOrder);
-router.post('/:id/abandon', orderController.abandonCheckout);
+router.post('/', requireStoreOrigin, orderCreateLimiter, orderController.createOrder);
+router.post('/lookup', requireStoreOrigin, lookupLimiter, orderController.lookupOrder);
+router.post(
+  '/:id/abandon',
+  requireStoreOrigin,
+  abandonLimiter,
+  orderController.abandonCheckout
+);
 
 router.use(auth, roleAuth(['admin']));
 

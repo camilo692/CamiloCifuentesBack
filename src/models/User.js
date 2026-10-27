@@ -26,6 +26,25 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  mfaEnabled: {
+    type: Boolean,
+    default: false
+  },
+  mfaSecret: {
+    type: String,
+    default: '',
+    select: false
+  },
+  failedLoginAttempts: {
+    type: Number,
+    default: 0,
+    select: false
+  },
+  lockUntil: {
+    type: Date,
+    default: null,
+    select: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

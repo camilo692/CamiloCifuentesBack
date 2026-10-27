@@ -1,10 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const errorHandler = require('./middlewares/errorHandler');
 const { createCorsOptions } = require('./config/cors');
+const { globalLimiter } = require('./middlewares/rateLimits');
 
 const healthRoutes = require('./routes/healthRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -21,9 +23,17 @@ dotenv.config();
 
 const app = express();
 
+app.set('trust proxy', 1);
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: true, limit: '200kb' }));
+app.use(globalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use(healthRoutes);

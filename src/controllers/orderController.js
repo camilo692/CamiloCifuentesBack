@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -161,18 +162,26 @@ const orderController = {
 
       if (wompiEnabled) {
         const wompi = buildWompiCheckout(savedOrder);
+        const checkoutToken = crypto.randomBytes(32).toString('hex');
         savedOrder.pago.reference = wompi.reference;
         savedOrder.pago.amountInCents = wompi.amountInCents;
         savedOrder.pago.reservadoHasta = reservationDeadline();
+        savedOrder.pago.checkoutToken = checkoutToken;
         await savedOrder.save();
+
+        const orderJson = savedOrder.toObject();
+        if (orderJson.pago) {
+          delete orderJson.pago.checkoutToken;
+        }
 
         return res.status(201).json({
           message: 'Orden creada. Completa el pago con Wompi.',
-          order: savedOrder,
+          order: orderJson,
           wompi: {
             ...wompi,
             reservadoHasta: savedOrder.pago.reservadoHasta,
             minutosReserva: STOCK_RESERVE_MINUTES,
+            checkoutToken,
           },
         });
       }
@@ -225,12 +234,24 @@ const orderController = {
         return res.status(400).json({ message: 'Orden inválida' });
       }
 
-      const order = await Order.findById(req.params.id);
+      const order = await Order.findById(req.params.id).select('+pago.checkoutToken');
       if (!order) {
         return res.status(404).json({ message: 'Orden no encontrada' });
       }
       if (order.pago?.estado === 'completado') {
         return res.status(409).json({ message: 'Este pedido ya fue pagado.' });
+      }
+
+      const expected = String(order.pago?.checkoutToken || '');
+      const provided = String(req.body?.token || '');
+      const expectedBuf = Buffer.from(expected);
+      const providedBuf = Buffer.from(provided);
+      const tokenOk =
+        expectedBuf.length > 0 &&
+        expectedBuf.length === providedBuf.length &&
+        crypto.timingSafeEqual(expectedBuf, providedBuf);
+      if (!tokenOk) {
+        return res.status(403).json({ message: 'No se pudo liberar esta reserva.' });
       }
 
       await restoreOrderStock(order);

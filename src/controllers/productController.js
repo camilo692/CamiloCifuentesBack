@@ -7,6 +7,7 @@ const {
   decrementProductStock,
   incrementProductStock,
 } = require('../utils/productStock');
+const { mapProductImages, mapProductsImages } = require('../utils/productImages');
 
 const productController = {
   // Get all products
@@ -14,7 +15,7 @@ const productController = {
     try {
       await expireStaleReservationsSafe();
       const products = await Product.find({ activo: true }).sort({ orden: 1, fechaCreacion: -1 });
-      res.json(products);
+      res.json(await mapProductsImages(products));
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -23,7 +24,7 @@ const productController = {
   getAllProductsAdmin: async (req, res) => {
     try {
       const products = await Product.find().sort({ orden: 1, fechaCreacion: -1 });
-      res.json(products);
+      res.json(await mapProductsImages(products));
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -38,7 +39,7 @@ const productController = {
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
-      res.json(product);
+      res.json(await mapProductImages(product));
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -54,7 +55,7 @@ const productController = {
         orden: 1,
         fechaCreacion: -1,
       });
-      res.json(products);
+      res.json(await mapProductsImages(products));
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -71,7 +72,7 @@ const productController = {
       if (!product || !product.activo) {
         return res.status(404).json({ message: 'Product not found' });
       }
-      res.json(product);
+      res.json(await mapProductImages(product));
     } catch (error) {
       res.status(500).json({ message: error.message });
     }

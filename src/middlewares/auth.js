@@ -12,6 +12,9 @@ const auth = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.purpose) {
+      return res.status(401).json({ message: 'Token is not valid' });
+    }
 
     // Get user from database
     const user = await User.findById(decoded.id).select('-password');
