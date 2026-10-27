@@ -5,6 +5,8 @@ const auth = require('../middlewares/auth');
 const roleAuth = require('../middlewares/roleAuth');
 
 router.post('/', orderController.createOrder);
+router.post('/lookup', orderController.lookupOrder);
+router.post('/:id/abandon', orderController.abandonCheckout);
 
 router.use(auth, roleAuth(['admin']));
 

@@ -15,6 +15,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const wompiRoutes = require('./routes/wompiRoutes');
+const { startReservationExpiryJob } = require('./services/stockReservation');
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ const startServer = async () => {
 
   app.listen(PORT, HOST, () => {
     console.log(`Server is running on ${HOST}:${PORT}`);
+    startReservationExpiryJob();
   });
 };
 

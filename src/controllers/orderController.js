@@ -11,11 +11,18 @@ const { enqueuePaymentJob } = require('../services/paymentsQueue');
 const { emitirFacturaSiigo } = require('../services/orderSiigo');
 const { isWompiEnabled } = require('../config/wompi');
 const { buildWompiCheckout } = require('../services/wompiService');
+const {
+  STOCK_RESERVE_MINUTES,
+  reservationDeadline,
+  expireStaleReservationsSafe,
+  restoreOrderStock,
+} = require('../services/stockReservation');
 
 const orderController = {
   // Crear nueva orden
   createOrder: async (req, res) => {
     try {
+      await expireStaleReservationsSafe();
       const { 
         cliente, 
         direccion, 
@@ -156,12 +163,17 @@ const orderController = {
         const wompi = buildWompiCheckout(savedOrder);
         savedOrder.pago.reference = wompi.reference;
         savedOrder.pago.amountInCents = wompi.amountInCents;
+        savedOrder.pago.reservadoHasta = reservationDeadline();
         await savedOrder.save();
 
         return res.status(201).json({
           message: 'Orden creada. Completa el pago con Wompi.',
           order: savedOrder,
-          wompi,
+          wompi: {
+            ...wompi,
+            reservadoHasta: savedOrder.pago.reservadoHasta,
+            minutosReserva: STOCK_RESERVE_MINUTES,
+          },
         });
       }
 
@@ -204,6 +216,100 @@ const orderController = {
       res.json(orders);
     } catch (error) {
       res.status(500).json({ message: error.message });
+    }
+  },
+
+  abandonCheckout: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Orden inválida' });
+      }
+
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: 'Orden no encontrada' });
+      }
+      if (order.pago?.estado === 'completado') {
+        return res.status(409).json({ message: 'Este pedido ya fue pagado.' });
+      }
+
+      await restoreOrderStock(order);
+      order.pago.estado = 'fallido';
+      order.pago.ultimoError = 'reserva_expirada';
+      if (order.estado === 'pendiente') {
+        order.estado = 'cancelada';
+      }
+      await order.save();
+      return res.json({ expired: true, minutosReserva: STOCK_RESERVE_MINUTES });
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  },
+
+  lookupOrder: async (req, res) => {
+    try {
+      const email = String(req.body.email || '').trim().toLowerCase();
+      const referencia = String(req.body.referencia || '')
+        .trim()
+        .replace(/\s/g, '')
+        .toUpperCase();
+
+      if (!email || referencia.length < 6) {
+        return res.status(400).json({
+          message: 'Escribe el correo del pedido y el número de orden.',
+        });
+      }
+
+      const orders = await Order.find({ 'cliente.email': email })
+        .sort({ fechaCreacion: -1 })
+        .limit(40);
+
+      const order = orders.find((item) => {
+        const id = String(item._id).toUpperCase();
+        return id === referencia || id.slice(-8) === referencia.slice(-8);
+      });
+
+      if (!order) {
+        return res.status(404).json({
+          message: 'No encontramos un pedido con esos datos.',
+        });
+      }
+
+      const estadoPago = {
+        en_cola: 'En proceso',
+        procesando: 'En proceso',
+        completado: 'Pagado',
+        fallido: 'Pago fallido',
+        omitido: 'Pendiente',
+      };
+
+      const estadoPedido = {
+        pendiente: 'Pendiente',
+        confirmada: 'Confirmado',
+        enviada: 'Enviado',
+        entregada: 'Entregado',
+        cancelada: 'Cancelado',
+      };
+
+      return res.json({
+        referencia: String(order._id).slice(-8).toUpperCase(),
+        estado: estadoPedido[order.estado] || order.estado,
+        pago: estadoPago[order.pago?.estado] || order.pago?.estado || 'Pendiente',
+        fecha: order.fechaCreacion,
+        subtotal: order.subtotal,
+        envio: order.envio,
+        total: order.total,
+        numeroGuia: order.numeroGuia || '',
+        ciudad: order.direccion?.ciudad || '',
+        productos: order.productos.map((item) => ({
+          nombre: item.nombre,
+          cantidad: item.cantidad,
+          talla: item.talla,
+          precio: item.precio,
+        })),
+      });
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
     }
   },
 

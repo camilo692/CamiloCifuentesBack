@@ -134,6 +134,10 @@ const orderSchema = new mongoose.Schema({
     processedAt: {
       type: Date,
       default: null
+    },
+    reservadoHasta: {
+      type: Date,
+      default: null
     }
   },
   notas: {

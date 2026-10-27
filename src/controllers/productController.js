@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const { expireStaleReservationsSafe } = require('../services/stockReservation');
 const {
   applyStockFromTallas,
   getAvailableStock,
@@ -11,6 +12,7 @@ const productController = {
   // Get all products
   getAllProducts: async (req, res) => {
     try {
+      await expireStaleReservationsSafe();
       const products = await Product.find({ activo: true }).sort({ orden: 1, fechaCreacion: -1 });
       res.json(products);
     } catch (error) {
@@ -64,7 +66,8 @@ const productController = {
       return res.status(400).json({ message: 'Invalid product ID format' });
     }
     try {
-      const product = await Product.findById(req.params.id);
+      await expireStaleReservationsSafe();
+      const product = await Product.findById(req.params.id).populate('categoria', 'name');
       if (!product || !product.activo) {
         return res.status(404).json({ message: 'Product not found' });
       }
