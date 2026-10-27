@@ -5,9 +5,14 @@ const mongoose = require('mongoose');
 const User = require('../src/models/User');
 
 const createAdmin = async () => {
-  const email = (process.argv[2] || 'camilocifuentes615@gmail.com').trim().toLowerCase();
-  const password = process.argv[3] || 'Ds.981215';
+  const email = String(process.argv[2] || '').trim().toLowerCase();
+  const password = String(process.argv[3] || '');
   const name = process.argv[4] || 'Administrador';
+
+  if (!email || !password) {
+    console.error('Uso: npm run create-admin -- correo@dominio.com CLAVE [Nombre]');
+    process.exit(1);
+  }
 
   try {
     await mongoose.connect(process.env.MONGODB_URI);
