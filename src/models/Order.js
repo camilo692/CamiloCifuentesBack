@@ -157,6 +157,21 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  correoConfirmacion: {
+    estado: {
+      type: String,
+      enum: ['pendiente', 'enviado', 'error', 'omitido'],
+      default: 'omitido'
+    },
+    enviadoEn: {
+      type: Date,
+      default: null
+    },
+    error: {
+      type: String,
+      default: ''
+    }
+  },
   siigoFactura: {
     estado: {
       type: String,

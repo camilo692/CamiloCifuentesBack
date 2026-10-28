@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const Order = require('../models/Order');
 const { emitirFacturaSiigo } = require('./orderSiigo');
+const { sendOrderPaidEmail } = require('./orderEmailService');
 const { getWompiConfig } = require('../config/wompi');
 const { restoreOrderStock } = require('./stockReservation');
 
@@ -158,6 +159,7 @@ async function applyWompiTransaction(transaction) {
     order.pago.ultimoError = '';
     await order.save();
     await emitirFacturaSiigo(order);
+    await sendOrderPaidEmail(order);
     return { ok: true, status, orderId: String(order._id) };
   }
 
