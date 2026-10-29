@@ -1,8 +1,10 @@
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
-const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const errorHandler = require('./middlewares/errorHandler');
 const { createCorsOptions } = require('./config/cors');
@@ -18,8 +20,6 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const wompiRoutes = require('./routes/wompiRoutes');
 const { startReservationExpiryJob } = require('./services/stockReservation');
-
-dotenv.config();
 
 const app = express();
 
