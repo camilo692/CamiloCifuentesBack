@@ -69,7 +69,8 @@ function buildCustomer(order) {
 }
 
 function buildItems(order, config) {
-  const taxes = config.taxId ? [{ id: config.taxId }] : undefined;
+  const taxes =
+    config.taxId && Number(order.iva || 0) > 0 ? [{ id: config.taxId }] : undefined;
 
   const items = (order.productos || []).map((item) => {
     const line = {
