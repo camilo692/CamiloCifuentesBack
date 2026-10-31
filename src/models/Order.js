@@ -205,6 +205,14 @@ const orderSchema = new mongoose.Schema({
     fechaEmision: {
       type: Date,
       default: null
+    },
+    mailEnviado: {
+      type: Boolean,
+      default: false
+    },
+    mailError: {
+      type: String,
+      default: ''
     }
   },
   fechaCreacion: {

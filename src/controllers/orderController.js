@@ -571,8 +571,13 @@ const orderController = {
       await emitirFacturaSiigo(order);
 
       if (order.siigoFactura?.estado === 'emitida') {
+        const mailOk = order.siigoFactura?.mailEnviado;
         return res.json({
-          message: 'Factura electrónica emitida en Siigo',
+          message: mailOk
+            ? 'Factura Siigo emitida y enviada al correo'
+            : (order.siigoFactura?.mailError
+              ? `Factura emitida, pero el correo de Siigo falló: ${order.siigoFactura.mailError}`
+              : 'Factura electrónica emitida en Siigo'),
           order,
         });
       }

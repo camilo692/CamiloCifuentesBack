@@ -131,6 +131,29 @@ function buildInvoicePayload(order, config, options = {}) {
   return payload;
 }
 
+async function enviarCorreoFacturaSiigo(invoiceId, order) {
+  const email = String(order?.cliente?.email || '').trim();
+  if (!invoiceId || !email) {
+    throw new Error('Falta el correo del cliente o el id de la factura Siigo');
+  }
+
+  const config = getSiigoConfig();
+  const body = {
+    guid: invoiceId,
+    mail_to: email,
+  };
+
+  const copy = String(config.username || '').trim();
+  if (copy && copy.includes('@') && copy.toLowerCase() !== email.toLowerCase()) {
+    body.copy_to = copy;
+  }
+
+  return siigoRequest(`/v1/invoices/${invoiceId}/mail`, {
+    method: 'POST',
+    body,
+  });
+}
+
 function isSendSettingsError(error) {
   const message = String(error?.message || '');
   return error?.status === 400 && /send cannot be used/i.test(message);
@@ -183,7 +206,6 @@ async function siigoRequest(path, { method = 'GET', body } = {}) {
 async function crearFacturaSiigo(order) {
   const config = getSiigoConfig();
   const attempts = [
-    { stamp: config.stamp, sendMail: config.sendMail },
     { stamp: config.stamp, sendMail: false },
     { stamp: false, sendMail: false },
   ];
@@ -226,6 +248,7 @@ function mapSiigoInvoiceResult(invoice) {
 
 module.exports = {
   crearFacturaSiigo,
+  enviarCorreoFacturaSiigo,
   mapSiigoInvoiceResult,
   buildInvoicePayload,
 };
