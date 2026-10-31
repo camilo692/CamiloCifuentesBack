@@ -1,5 +1,5 @@
-const IVA_RATE = 0;
-const COSTO_ENVIO = 0;
+const IVA_RATE = 0.19;
+const COSTO_ENVIO = 18000;
 
 function calcIva(subtotal) {
   return Math.round(Number(subtotal || 0) * IVA_RATE);
