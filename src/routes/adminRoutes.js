@@ -7,5 +7,7 @@ const roleAuth = require('../middlewares/roleAuth');
 router.use(auth, roleAuth(['admin']));
 
 router.get('/stats', adminController.getStats);
+router.get('/inventory.pdf', adminController.downloadInventoryPdf);
+router.get('/orders.pdf', adminController.downloadOrdersPdf);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { getSiigoPublicStatus } = require('../config/siigo');
+const { streamInventoryPdf, streamOrdersPdf } = require('../services/reportPdfService');
 
 const adminController = {
   getStats: async (_req, res) => {
@@ -94,7 +95,27 @@ const adminController = {
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
-  }
+  },
+
+  downloadInventoryPdf: async (req, res) => {
+    try {
+      await streamInventoryPdf(res, { filtro: req.query.filtro });
+    } catch (error) {
+      if (!res.headersSent) {
+        res.status(500).json({ message: error.message || 'No se pudo generar el inventario' });
+      }
+    }
+  },
+
+  downloadOrdersPdf: async (req, res) => {
+    try {
+      await streamOrdersPdf(res, { estado: req.query.estado });
+    } catch (error) {
+      if (!res.headersSent) {
+        res.status(500).json({ message: error.message || 'No se pudo generar el PDF de pedidos' });
+      }
+    }
+  },
 };
 
 module.exports = adminController;
