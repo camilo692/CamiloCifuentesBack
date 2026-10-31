@@ -100,11 +100,13 @@ function buildItems(order, config) {
   return items;
 }
 
-function buildInvoicePayload(order, config) {
+function buildInvoicePayload(order, config, options = {}) {
   const items = buildItems(order, config);
   const total = roundMoney(order.total);
+  const stamp = options.stamp ?? config.stamp;
+  const sendMail = options.sendMail ?? config.sendMail;
 
-  return {
+  const payload = {
     document: { id: config.documentId },
     date: todayIsoDate(),
     customer: buildCustomer(order),
@@ -117,9 +119,21 @@ function buildInvoicePayload(order, config) {
         value: total,
       },
     ],
-    stamp: { send: config.stamp },
-    mail: { send: config.sendMail },
   };
+
+  if (stamp) {
+    payload.stamp = { send: true };
+  }
+  if (sendMail) {
+    payload.mail = { send: true };
+  }
+
+  return payload;
+}
+
+function isSendSettingsError(error) {
+  const message = String(error?.message || '');
+  return error?.status === 400 && /send cannot be used/i.test(message);
 }
 
 async function siigoRequest(path, { method = 'GET', body } = {}) {
@@ -168,8 +182,34 @@ async function siigoRequest(path, { method = 'GET', body } = {}) {
 
 async function crearFacturaSiigo(order) {
   const config = getSiigoConfig();
-  const payload = buildInvoicePayload(order, config);
-  return siigoRequest('/v1/invoices', { method: 'POST', body: payload });
+  const attempts = [
+    { stamp: config.stamp, sendMail: config.sendMail },
+    { stamp: config.stamp, sendMail: false },
+    { stamp: false, sendMail: false },
+  ];
+
+  const seen = new Set();
+  let lastError;
+
+  for (const options of attempts) {
+    const key = `${options.stamp}:${options.sendMail}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    try {
+      return await siigoRequest('/v1/invoices', {
+        method: 'POST',
+        body: buildInvoicePayload(order, config, options),
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isSendSettingsError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 function mapSiigoInvoiceResult(invoice) {
