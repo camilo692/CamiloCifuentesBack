@@ -83,6 +83,10 @@ const orderSchema = new mongoose.Schema({
     required: true,
     default: 0
   },
+  iva: {
+    type: Number,
+    default: 0
+  },
   total: {
     type: Number,
     required: true

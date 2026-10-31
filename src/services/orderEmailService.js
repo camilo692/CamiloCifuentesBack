@@ -26,7 +26,7 @@ function buildBodies(order, storeUrl) {
   const referencia = orderReference(order);
   const lineas = (order.productos || []).map((item) => {
     const talla = item.talla ? ` · talla ${item.talla}` : '';
-    return `${item.cantidad} × ${item.nombre}${talla} — ${formatMoney(item.precio * item.cantidad)}`;
+    return `${item.cantidad} × ${item.nombre}${talla} — ${formatMoney(item.precio * item.cantidad)} + IVA`;
   });
   const consulta = `${storeUrl}/tienda/pedido`;
 
@@ -37,7 +37,9 @@ function buildBodies(order, storeUrl) {
     '',
     `Número de orden: ${referencia}`,
     ...lineas,
-    `Envío: gratis`,
+    `Subtotal: ${formatMoney(order.subtotal)}`,
+    `IVA 19%: ${formatMoney(order.iva || 0)}`,
+    `Envío: ${formatMoney(order.envio || 0)}`,
     `Total: ${formatMoney(order.total)}`,
     '',
     `Consulta el pedido con este correo y el número de orden: ${consulta}`,
@@ -50,7 +52,7 @@ function buildBodies(order, storeUrl) {
   const filas = (order.productos || [])
     .map((item) => {
       const talla = item.talla ? ` talla ${escapeHtml(item.talla)}` : '';
-      return `<tr><td style="padding:6px 0">${escapeHtml(String(item.cantidad))} × ${escapeHtml(item.nombre)}${talla}</td><td style="padding:6px 0;text-align:right">${formatMoney(item.precio * item.cantidad)}</td></tr>`;
+      return `<tr><td style="padding:6px 0">${escapeHtml(String(item.cantidad))} × ${escapeHtml(item.nombre)}${talla}</td><td style="padding:6px 0;text-align:right">${formatMoney(item.precio * item.cantidad)} + IVA</td></tr>`;
     })
     .join('');
 
@@ -60,7 +62,7 @@ function buildBodies(order, storeUrl) {
       <p>Confirmamos tu pedido en <strong>Camilo Cifuentes</strong>. El pago ya fue aprobado.</p>
       <p>Número de orden: <strong>${escapeHtml(referencia)}</strong></p>
       <table style="width:100%;border-collapse:collapse">${filas}</table>
-      <p>Envío: <strong>gratis</strong><br/>Total: <strong>${formatMoney(order.total)}</strong></p>
+      <p>Subtotal: <strong>${formatMoney(order.subtotal)}</strong><br/>IVA 19%: <strong>${formatMoney(order.iva || 0)}</strong><br/>Envío: <strong>${formatMoney(order.envio || 0)}</strong><br/>Total: <strong>${formatMoney(order.total)}</strong></p>
       <p>Consulta el pedido con este correo y el número de orden:<br/><a href="${escapeHtml(consulta)}">${escapeHtml(consulta)}</a></p>
       <p>El despacho se gestiona después de este cobro.</p>
       <p>Camilo Cifuentes</p>

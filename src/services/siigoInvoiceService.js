@@ -81,7 +81,6 @@ function buildItems(order, config) {
 
     if (taxes) {
       line.taxes = taxes;
-      line.taxed_price = roundMoney(item.precio);
     }
     return line;
   });
@@ -93,10 +92,7 @@ function buildItems(order, config) {
       quantity: 1,
       price: roundMoney(order.envio),
     };
-    if (taxes) {
-      shipping.taxes = taxes;
-      shipping.taxed_price = roundMoney(order.envio);
-    }
+    // El envío se cobra aparte, sin IVA extra.
     items.push(shipping);
   }
 

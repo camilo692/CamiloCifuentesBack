@@ -1,11 +1,32 @@
 const PDFDocument = require('pdfkit');
+const sharp = require('sharp');
 const Product = require('../models/Product');
 require('../models/Category');
 const Order = require('../models/Order');
 const { TALLAS_ESTANDAR } = require('../utils/productStock');
 
+const IVA_RATE = 0.19;
+
 function money(value) {
   return `$${Number(value || 0).toLocaleString('es-CO')}`;
+}
+
+function moneyMasIva(value) {
+  return `${money(value)} + IVA`;
+}
+
+function drawAmountRows(doc, rows) {
+  rows.forEach((row) => {
+    ensureSpace(doc, 16);
+    const y = doc.y + 2;
+    doc.font(row.bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(row.bold ? 10 : 9)
+      .fillColor('#111111');
+    doc.text(row.label, 48, y, { width: 300 });
+    doc.text(row.value, 348, y, { width: 207, align: 'right' });
+    doc.y = y + 14;
+  });
+  doc.fillColor('#000000');
 }
 
 function formatDate(value) {
@@ -43,23 +64,44 @@ function drawHeader(doc, title, subtitle) {
   doc.y = 70;
 }
 
-async function fetchImage(url) {
+async function thumbnail(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 6000);
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timer);
     if (!response.ok) return null;
-    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-    if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
-      return null;
-    }
-    const buf = Buffer.from(await response.arrayBuffer());
-    return buf.length > 40 ? buf : null;
+    const raw = Buffer.from(await response.arrayBuffer());
+    if (raw.length < 40) return null;
+    return sharp(raw)
+      .rotate()
+      .resize(160, 160, { fit: 'cover', withoutEnlargement: true })
+      .jpeg({ quality: 70 })
+      .toBuffer();
   } catch {
     return null;
   }
+}
+
+async function loadThumbnails(products) {
+  const thumbs = new Map();
+  const queue = products.filter((product) => product.imagen);
+  const workers = 6;
+  let index = 0;
+
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      while (index < queue.length) {
+        const product = queue[index];
+        index += 1;
+        const image = await thumbnail(product.imagen);
+        if (image) thumbs.set(String(product._id), image);
+      }
+    })
+  );
+
+  return thumbs;
 }
 
 function sizeRows(product) {
@@ -75,12 +117,26 @@ function sizeRows(product) {
   return TALLAS_ESTANDAR.map((talla) => ({ talla, cantidad: 0 }));
 }
 
-function pipePdf(res, filename) {
-  const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: filename } });
+function renderPdf(filename, draw) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: filename } });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve({ filename, buffer: Buffer.concat(chunks) }));
+    doc.on('error', reject);
+
+    Promise.resolve()
+      .then(() => draw(doc))
+      .then(() => doc.end())
+      .catch(reject);
+  });
+}
+
+function sendPdf(res, filename, buffer) {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  doc.pipe(res);
-  return doc;
+  res.setHeader('Content-Length', buffer.length);
+  res.send(buffer);
 }
 
 async function streamInventoryPdf(res, { filtro } = {}) {
@@ -98,71 +154,88 @@ async function streamInventoryPdf(res, { filtro } = {}) {
     return true;
   });
 
+  const thumbs = await loadThumbnails(filtered);
   const stamp = new Date().toISOString().slice(0, 10);
-  const doc = pipePdf(res, `inventario-camilo-${stamp}.pdf`);
-  drawHeader(
-    doc,
-    'Inventario',
-    `Generado ${formatDate(new Date())}  ·  ${filtered.length} prendas`
-  );
+  const filename = `inventario-camilo-${stamp}.pdf`;
 
-  if (filtered.length === 0) {
-    doc.fontSize(12).text('No hay productos para este filtro.');
-    doc.end();
-    return;
-  }
+  const { buffer } = await renderPdf(filename, (doc) => {
+    drawHeader(
+      doc,
+      'Inventario',
+      `Generado ${formatDate(new Date())}  ·  ${filtered.length} prendas`
+    );
 
-  for (const product of filtered) {
-    ensureSpace(doc, 130);
-    const top = doc.y;
-    const imageBuf = await fetchImage(product.imagen);
-    if (imageBuf) {
-      try {
-        doc.image(imageBuf, 40, top, { fit: [78, 78] });
-      } catch {
-        doc.rect(40, top, 78, 78).stroke('#dddddd');
-      }
-    } else {
-      doc.rect(40, top, 78, 78).fillAndStroke('#f4f4f4', '#dddddd');
-      doc.fillColor('#999999').fontSize(8).text('Sin foto', 40, top + 34, { width: 78, align: 'center' });
-      doc.fillColor('#000000');
+    if (filtered.length === 0) {
+      doc.fontSize(12).text('No hay productos para este filtro.');
+      return;
     }
 
-    const textX = 132;
-    doc.font('Helvetica-Bold').fontSize(12).text(product.nombre || 'Sin nombre', textX, top, {
-      width: 390,
-    });
-    doc.font('Helvetica').fontSize(9).fillColor('#555555');
-    doc.text(
-      `${product.categoria?.name || 'Sin categoría'}  ·  ${money(product.precio)}  ·  Stock total: ${product.stock ?? 0}`,
-      textX,
-      doc.y + 2,
-      { width: 390 }
+    for (const product of filtered) {
+      ensureSpace(doc, 130);
+      const top = doc.y;
+      const imageBuf = thumbs.get(String(product._id));
+      if (imageBuf) {
+        try {
+          doc.image(imageBuf, 40, top, { fit: [78, 78] });
+        } catch {
+          doc.rect(40, top, 78, 78).stroke('#dddddd');
+        }
+      } else {
+        doc.rect(40, top, 78, 78).fillAndStroke('#f4f4f4', '#dddddd');
+        doc.fillColor('#999999').fontSize(8).text('Sin foto', 40, top + 34, { width: 78, align: 'center' });
+        doc.fillColor('#000000');
+      }
+
+      const textX = 132;
+      doc.font('Helvetica-Bold').fontSize(12).text(product.nombre || 'Sin nombre', textX, top, {
+        width: 390,
+      });
+      doc.font('Helvetica').fontSize(9).fillColor('#555555');
+      doc.text(
+        `${product.categoria?.name || 'Sin categoría'}  ·  ${moneyMasIva(product.precio)}  ·  Stock total: ${product.stock ?? 0}`,
+        textX,
+        doc.y + 2,
+        { width: 390 }
+      );
+      doc.fillColor('#000000');
+
+      const rows = sizeRows(product);
+      const tableY = Math.max(doc.y + 10, top + 52);
+      const colW = Math.min(46, 390 / Math.max(rows.length, 1));
+      rows.forEach((row, rowIndex) => {
+        const x = textX + rowIndex * colW;
+        doc.rect(x, tableY, colW - 4, 28).stroke('#dddddd');
+        doc.font('Helvetica-Bold').fontSize(8).text(row.talla, x, tableY + 3, {
+          width: colW - 4,
+          align: 'center',
+        });
+        doc.font('Helvetica').fontSize(10).text(String(row.cantidad), x, tableY + 14, {
+          width: colW - 4,
+          align: 'center',
+        });
+      });
+
+      doc.y = Math.max(tableY + 40, top + 90);
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#eeeeee');
+      doc.y += 12;
+    }
+
+    const valor = filtered.reduce(
+      (sum, product) => sum + Number(product.precio || 0) * Number(product.stock || 0),
+      0
     );
-    doc.fillColor('#000000');
+    const iva = Math.round(valor * IVA_RATE);
+    ensureSpace(doc, 70);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#cccccc');
+    doc.y += 8;
+    drawAmountRows(doc, [
+      { label: 'Valor inventario', value: money(valor) },
+      { label: 'IVA 19%', value: money(iva) },
+      { label: 'Total inventario', value: money(valor + iva), bold: true },
+    ]);
+  });
 
-    const rows = sizeRows(product);
-    let tableY = Math.max(doc.y + 10, top + 52);
-    const colW = Math.min(46, 390 / Math.max(rows.length, 1));
-    rows.forEach((row, index) => {
-      const x = textX + index * colW;
-      doc.rect(x, tableY, colW - 4, 28).stroke('#dddddd');
-      doc.font('Helvetica-Bold').fontSize(8).text(row.talla, x, tableY + 3, {
-        width: colW - 4,
-        align: 'center',
-      });
-      doc.font('Helvetica').fontSize(10).text(String(row.cantidad), x, tableY + 14, {
-        width: colW - 4,
-        align: 'center',
-      });
-    });
-
-    doc.y = Math.max(tableY + 40, top + 90);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#eeeeee');
-    doc.y += 12;
-  }
-
-  doc.end();
+  sendPdf(res, filename, buffer);
 }
 
 async function streamOrdersPdf(res, { estado } = {}) {
@@ -174,56 +247,71 @@ async function streamOrdersPdf(res, { estado } = {}) {
 
   const orders = await Order.find(filter).sort({ fechaCreacion: -1 }).lean();
   const stamp = new Date().toISOString().slice(0, 10);
-  const doc = pipePdf(res, `pedidos-camilo-${stamp}.pdf`);
-  drawHeader(
-    doc,
-    'Pedidos',
-    `Generado ${formatDate(new Date())}  ·  ${orders.length} órdenes`
-  );
+  const filename = `pedidos-camilo-${stamp}.pdf`;
 
-  if (orders.length === 0) {
-    doc.fontSize(12).text('No hay pedidos para este filtro.');
-    doc.end();
-    return;
-  }
-
-  for (const order of orders) {
-    ensureSpace(doc, 90);
-    const nombre = [order.cliente?.nombre, order.cliente?.apellidos].filter(Boolean).join(' ') || 'Cliente';
-    doc.font('Helvetica-Bold').fontSize(11).text(`Pedido ${orderRef(order)}`, 40, doc.y);
-    doc.font('Helvetica').fontSize(9).fillColor('#444444');
-    doc.text(
-      `${formatDate(order.fechaCreacion)}  ·  ${nombre}  ·  ${order.cliente?.email || 'sin correo'}`,
-      40,
-      doc.y + 2,
-      { width: 515 }
+  const { buffer } = await renderPdf(filename, (doc) => {
+    drawHeader(
+      doc,
+      'Pedidos',
+      `Generado ${formatDate(new Date())}  ·  ${orders.length} órdenes`
     );
-    doc.text(
-      `Estado: ${order.estado || '—'}  ·  Pago: ${order.pago?.estado || '—'}  ·  Total: ${money(order.total)}`,
-      40,
-      doc.y + 2,
-      { width: 515 }
-    );
-    doc.fillColor('#000000');
 
-    const items = order.productos || [];
-    items.forEach((item) => {
-      ensureSpace(doc, 16);
-      const talla = item.talla ? ` · talla ${item.talla}` : '';
-      doc.font('Helvetica').fontSize(9).fillColor('#111111').text(
-        `${item.cantidad || 0} × ${item.nombre || 'Prenda'}${talla}  —  ${money((item.precio || 0) * (item.cantidad || 0))}`,
-        48,
+    if (orders.length === 0) {
+      doc.fontSize(12).text('No hay pedidos para este filtro.');
+      return;
+    }
+
+    for (const order of orders) {
+      ensureSpace(doc, 90);
+      const nombre = [order.cliente?.nombre, order.cliente?.apellidos].filter(Boolean).join(' ') || 'Cliente';
+      doc.font('Helvetica-Bold').fontSize(11).text(`Pedido ${orderRef(order)}`, 40, doc.y);
+      doc.font('Helvetica').fontSize(9).fillColor('#444444');
+      doc.text(
+        `${formatDate(order.fechaCreacion)}  ·  ${nombre}  ·  ${order.cliente?.email || 'sin correo'}`,
+        40,
         doc.y + 2,
-        { width: 500 }
+        { width: 515 }
       );
-    });
-    doc.fillColor('#000000');
+      doc.text(
+        `Estado: ${order.estado || '—'}  ·  Pago: ${order.pago?.estado || '—'}  ·  Total: ${money(order.total)}`,
+        40,
+        doc.y + 2,
+        { width: 515 }
+      );
+      doc.fillColor('#000000');
 
-    doc.moveTo(40, doc.y + 8).lineTo(555, doc.y + 8).stroke('#eeeeee');
-    doc.y += 18;
-  }
+      const items = order.productos || [];
+      items.forEach((item) => {
+        ensureSpace(doc, 16);
+        const talla = item.talla ? ` · talla ${item.talla}` : '';
+        const lineTotal = (item.precio || 0) * (item.cantidad || 0);
+        doc.font('Helvetica').fontSize(9).fillColor('#111111').text(
+          `${item.cantidad || 0} × ${item.nombre || 'Prenda'}${talla}  —  ${moneyMasIva(lineTotal)}`,
+          48,
+          doc.y + 2,
+          { width: 500 }
+        );
+      });
 
-  doc.end();
+      const subtotal = Number(order.subtotal || 0);
+      const iva = Number(order.iva || 0);
+      const envio = Number(order.envio || 0);
+      ensureSpace(doc, 72);
+      doc.y += 6;
+      drawAmountRows(doc, [
+        { label: 'Subtotal', value: money(subtotal) },
+        { label: 'IVA 19%', value: money(iva) },
+        { label: 'Envío', value: money(envio) },
+        { label: 'Total', value: money(order.total), bold: true },
+      ]);
+      doc.fillColor('#000000');
+
+      doc.moveTo(40, doc.y + 8).lineTo(555, doc.y + 8).stroke('#eeeeee');
+      doc.y += 18;
+    }
+  });
+
+  sendPdf(res, filename, buffer);
 }
 
 module.exports = {

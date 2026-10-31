@@ -11,6 +11,7 @@ const { isPaymentsQueueEnabled } = require('../config/queue');
 const { enqueuePaymentJob } = require('../services/paymentsQueue');
 const { emitirFacturaSiigo } = require('../services/orderSiigo');
 const { isWompiEnabled } = require('../config/wompi');
+const { calcOrderTotals } = require('../utils/pricing');
 const { buildWompiCheckout } = require('../services/wompiService');
 const {
   STOCK_RESERVE_MINUTES,
@@ -29,7 +30,6 @@ const orderController = {
         direccion, 
         metodoPago, 
         notas = '',
-        envio = 0,
         productos = []
       } = req.body;
       
@@ -78,7 +78,7 @@ const orderController = {
         });
       }
       
-      const total = subtotal + envio;
+      const { iva, envio, total } = calcOrderTotals(subtotal);
 
       const reservas = [];
       for (const item of productosCompletos) {
@@ -122,6 +122,7 @@ const orderController = {
           direccion,
           productos: productosCompletos,
           subtotal,
+          iva,
           envio,
           total,
           metodoPago: metodo,
@@ -318,6 +319,7 @@ const orderController = {
         pago: estadoPago[order.pago?.estado] || order.pago?.estado || 'Pendiente',
         fecha: order.fechaCreacion,
         subtotal: order.subtotal,
+        iva: order.iva || 0,
         envio: order.envio,
         total: order.total,
         numeroGuia: order.numeroGuia || '',
@@ -436,7 +438,6 @@ const orderController = {
         direccion, 
         metodoPago, 
         notas,
-        envio,
         productos 
       } = req.body;
       
@@ -461,7 +462,6 @@ const orderController = {
       if (direccion) order.direccion = direccion;
       if (metodoPago) order.metodoPago = metodoPago;
       if (notas !== undefined) order.notas = notas;
-      if (envio !== undefined) order.envio = envio;
       
       // Si se actualizan productos, recalcular totales
       if (productos && productos.length > 0) {
@@ -498,9 +498,12 @@ const orderController = {
           });
         }
         
+        const totals = calcOrderTotals(subtotal);
         order.productos = productosCompletos;
-        order.subtotal = subtotal;
-        order.total = subtotal + (order.envio || 0);
+        order.subtotal = totals.subtotal;
+        order.iva = totals.iva;
+        order.envio = totals.envio;
+        order.total = totals.total;
       }
       
       const updatedOrder = await order.save();
