@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { getSiigoPublicStatus } = require('../config/siigo');
 const { streamInventoryPdf, streamOrdersPdf } = require('../services/reportPdfService');
+const { getVisitStats } = require('./visitController');
 
 const adminController = {
   getStats: async (_req, res) => {
@@ -49,6 +50,7 @@ const adminController = {
         .select('cliente total estado fechaCreacion siigoFactura');
 
       const totalProductos = await Product.countDocuments({ activo: true });
+      const visitas = await getVisitStats();
 
       const facturacionPorEstado = {
         emitida: 0,
@@ -83,6 +85,7 @@ const adminController = {
         topProductos,
         pedidosRecientes,
         totalProductos,
+        visitas,
         siigo: {
           ...getSiigoPublicStatus(),
           porEstado: facturacionPorEstado,

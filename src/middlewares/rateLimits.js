@@ -38,6 +38,14 @@ const abandonLimiter = rateLimit({
   handler: tooMany,
 });
 
+const visitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(204).send(),
+});
+
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 400,
@@ -52,5 +60,6 @@ module.exports = {
   orderCreateLimiter,
   lookupLimiter,
   abandonLimiter,
+  visitLimiter,
   globalLimiter,
 };

@@ -18,6 +18,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const visitRoutes = require('./routes/visitRoutes');
 const wompiRoutes = require('./routes/wompiRoutes');
 const { startReservationExpiryJob } = require('./services/stockReservation');
 
@@ -45,6 +46,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payments', wompiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/visits', visitRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the backend API' });
