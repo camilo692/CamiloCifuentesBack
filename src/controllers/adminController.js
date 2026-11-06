@@ -1,7 +1,8 @@
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { getSiigoPublicStatus } = require('../config/siigo');
-const { streamInventoryPdf, streamOrdersPdf } = require('../services/reportPdfService');
+const { streamInventoryPdf, streamOrdersPdf, streamOrderDetailPdf } = require('../services/reportPdfService');
+const mongoose = require('mongoose');
 const { getVisitStats } = require('./visitController');
 
 const adminController = {
@@ -116,6 +117,21 @@ const adminController = {
     } catch (error) {
       if (!res.headersSent) {
         res.status(500).json({ message: error.message || 'No se pudo generar el PDF de pedidos' });
+      }
+    }
+  },
+
+  downloadOrderPdf: async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'ID de orden inválido' });
+      }
+      await streamOrderDetailPdf(res, req.params.id);
+    } catch (error) {
+      if (!res.headersSent) {
+        res.status(error.status || 500).json({
+          message: error.message || 'No se pudo generar el PDF del pedido',
+        });
       }
     }
   },

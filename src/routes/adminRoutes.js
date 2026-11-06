@@ -9,5 +9,6 @@ router.use(auth, roleAuth(['admin']));
 router.get('/stats', adminController.getStats);
 router.get('/inventory.pdf', adminController.downloadInventoryPdf);
 router.get('/orders.pdf', adminController.downloadOrdersPdf);
+router.get('/orders/:id/pdf', adminController.downloadOrderPdf);
 
 module.exports = router;

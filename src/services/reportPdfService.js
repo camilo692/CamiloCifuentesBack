@@ -314,7 +314,88 @@ async function streamOrdersPdf(res, { estado } = {}) {
   sendPdf(res, filename, buffer);
 }
 
+function drawKv(doc, label, value) {
+  ensureSpace(doc, 16);
+  const y = doc.y;
+  doc.font('Helvetica').fontSize(9).fillColor('#666666').text(label, 40, y, { width: 150 });
+  doc.font('Helvetica').fontSize(9).fillColor('#111111').text(String(value || '—'), 200, y, { width: 355 });
+  doc.y = y + 15;
+}
+
+async function streamOrderDetailPdf(res, orderId) {
+  const order = await Order.findById(orderId).lean();
+  if (!order) {
+    const error = new Error('Orden no encontrada');
+    error.status = 404;
+    throw error;
+  }
+
+  const ref = orderRef(order);
+  const filename = `pedido-${ref}.pdf`;
+  const nombre = [order.cliente?.nombre, order.cliente?.apellidos].filter(Boolean).join(' ') || 'Cliente';
+  const direccion = [
+    order.direccion?.calle,
+    order.direccion?.complemento,
+    [order.direccion?.ciudad, order.direccion?.departamento].filter(Boolean).join(', '),
+    order.direccion?.codigoPostal,
+    order.direccion?.pais,
+  ].filter(Boolean).join(' · ');
+
+  const { buffer } = await renderPdf(filename, (doc) => {
+    drawHeader(doc, `Pedido ${ref}`, formatDate(order.fechaCreacion));
+
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000').text('Cliente', 40, doc.y);
+    doc.y += 6;
+    drawKv(doc, 'Nombre', nombre);
+    drawKv(doc, 'Email', order.cliente?.email);
+    drawKv(doc, 'Teléfono', order.cliente?.telefono);
+    drawKv(doc, 'Cédula', order.cliente?.cedula);
+
+    doc.y += 8;
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000').text('Envío', 40, doc.y);
+    doc.y += 6;
+    drawKv(doc, 'Dirección', direccion);
+    drawKv(doc, 'Guía', order.numeroGuia);
+
+    doc.y += 8;
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000').text('Productos', 40, doc.y);
+    doc.y += 8;
+    (order.productos || []).forEach((item) => {
+      ensureSpace(doc, 16);
+      const talla = item.talla ? ` · talla ${item.talla}` : '';
+      const lineTotal = (item.precio || 0) * (item.cantidad || 0);
+      doc.font('Helvetica').fontSize(9).fillColor('#111111').text(
+        `${item.cantidad || 0} × ${item.nombre || 'Prenda'}${talla}  —  ${moneyMasIva(lineTotal)}`,
+        40,
+        doc.y,
+        { width: 515 }
+      );
+    });
+
+    doc.y += 10;
+    drawAmountRows(doc, [
+      { label: 'Subtotal', value: money(order.subtotal) },
+      { label: 'IVA 19%', value: money(order.iva || 0) },
+      { label: 'Envío', value: money(order.envio || 0) },
+      { label: 'Total', value: money(order.total), bold: true },
+    ]);
+
+    doc.y += 10;
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#000000').text('Estado', 40, doc.y);
+    doc.y += 6;
+    drawKv(doc, 'Pedido', order.estado);
+    drawKv(doc, 'Pago', order.pago?.estado);
+    drawKv(doc, 'Método', order.metodoPago);
+    drawKv(doc, 'Siigo', order.siigoFactura?.name || order.siigoFactura?.estado);
+    if (order.notas) drawKv(doc, 'Notas cliente', order.notas);
+    if (order.notasInternas) drawKv(doc, 'Notas internas', order.notasInternas);
+  });
+
+  sendPdf(res, filename, buffer);
+}
+
 module.exports = {
   streamInventoryPdf,
   streamOrdersPdf,
+  streamOrderDetailPdf,
 };
