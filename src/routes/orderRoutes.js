@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
+const adminController = require('../controllers/adminController');
 const auth = require('../middlewares/auth');
 const roleAuth = require('../middlewares/roleAuth');
 const requireStoreOrigin = require('../middlewares/requireStoreOrigin');
@@ -23,6 +24,7 @@ router.use(auth, roleAuth(['admin']));
 
 router.get('/', orderController.getAllOrders);
 router.get('/cliente/:email', orderController.getOrdersByEmail);
+router.get('/:id/pdf', adminController.downloadOrderPdf);
 router.get('/:id', orderController.getOrderById);
 router.put('/:id/status', orderController.updateOrderStatus);
 router.post('/:id/siigo-invoice', orderController.retrySiigoInvoice);
